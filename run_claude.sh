@@ -5,6 +5,24 @@ cd "$(dirname "$0")"
 
 # Default values
 WORKSPACE_DIR="$(pwd)"
+CLAUDE_HOME="$HOME/.claude"
+
+# Function to validate the workspace path (Fix VULN-002)
+validate_workspace() {
+    local path="$1"
+    # Ensure the path exists and is a directory
+    if [ ! -d "$path" ]; then
+        echo "Error: Workspace path '$path' does not exist or is not a directory."
+        exit 1
+    fi
+    # Security check: avoid mounting sensitive system directories
+    case "$path" in
+        /|/etc|/etc/|/root|/root/|/boot|/boot/|/sys|/sys/)
+            echo "Security Error: Mounting sensitive system directory '$path' as workspace is not allowed."
+            exit 1
+            ;;
+    esac
+}
 
 show_help() {
     echo "Usage: ./run_claude.sh [options]"
@@ -25,6 +43,7 @@ while [[ "$#" -gt 0 ]]; do
         --workspace)
             if [[ -n "$2" ]]; then
                 WORKSPACE_DIR=$(readlink -f "$2")
+                validate_workspace "$WORKSPACE_DIR"
                 shift 2
             else
                 echo "Error: --workspace requires a path."
@@ -64,6 +83,7 @@ echo "Launching container..."
 echo "Image:     $IMAGE"
 echo "Socket:    /var/run/docker.sock"
 echo "Workspace: $WORKSPACE_DIR"
+echo "Claude session: $CLAUDE_HOME"
 echo "------------------------------------------"
 
 # Determine if sudo is needed for docker socket access
@@ -78,14 +98,14 @@ fi
 # -it: Interactive terminal
 # -v /var/run/docker.sock: Allow Claude to manage other containers
 # -v "$WORKSPACE_DIR":/workspace: Mount custom directory to the container's workspace (RW)
-# -v "$(pwd)/.claude:/home/ubuntu/.claude": Persist Claude login and session info
+# -v "$CLAUDE_HOME":/home/ubuntu/.claude: Persist Claude login and session info from host home
 # --workdir /workspace: Ensure we start in the mounted directory
-mkdir -p "$(pwd)/.claude"
+mkdir -p "$CLAUDE_HOME"
 $DOCKER_CMD run -it --rm \
     --name claude-runner \
     -v /var/run/docker.sock:/var/run/docker.sock \
     -v "$WORKSPACE_DIR:/workspace" \
-    -v "$(pwd)/.claude:/home/ubuntu/.claude" \
+    -v "$CLAUDE_HOME:/home/ubuntu/.claude" \
     --workdir /workspace \
     "$IMAGE" \
     $COMMAND

@@ -6,6 +6,24 @@ cd "$(dirname "$0")"
 # Default values
 DOCKER_MOUNT="/var/run/docker.sock"
 WORKSPACE_DIR="$(pwd)"
+CLAUDE_HOME="$HOME/.claude"
+
+# Function to validate the workspace path (Fix VULN-002)
+validate_workspace() {
+    local path="$1"
+    # Ensure the path exists and is a directory
+    if [ ! -d "$path" ]; then
+        echo "Error: Workspace path '$path' does not exist or is not a directory."
+        exit 1
+    fi
+    # Security check: avoid mounting sensitive system directories
+    case "$path" in
+        /|/etc|/etc/|/root|/root/|/boot|/boot/|/sys|/sys/)
+            echo "Security Error: Mounting sensitive system directory '$path' as workspace is not allowed."
+            exit 1
+            ;;
+    esac
+}
 
 show_help() {
     echo "Usage: ./start_ollama.sh [options]"
@@ -32,6 +50,7 @@ while [[ "$#" -gt 0 ]]; do
             if [[ -n "$2" ]]; then
                 # Resolve to absolute path
                 WORKSPACE_DIR=$(readlink -f "$2")
+                validate_workspace "$WORKSPACE_DIR"
                 shift 2
             else
                 echo "Error: --workspace requires a path."
@@ -156,12 +175,21 @@ else
     echo "OLLAMA_WORKSPACE=$WORKSPACE_DIR" >> .env
 fi
 
+# Update or add the Claude session directory variable
+if grep -q "OLLAMA_CLAUDE_HOME" .env; then
+    # Use sed to update existing variable
+    sed -i "s|^OLLAMA_CLAUDE_HOME=.*|OLLAMA_CLAUDE_HOME=$CLAUDE_HOME|" .env
+else
+    echo "OLLAMA_CLAUDE_HOME=$CLAUDE_HOME" >> .env
+fi
+
 echo "------------------------------------------"
 echo "Launching with workspace: $WORKSPACE_DIR"
+echo "Claude session: $CLAUDE_HOME"
 echo "------------------------------------------"
 echo "Starting Ollama container in the background..."
-# Pre-create data directories to ensure they're not owned by root
-mkdir -p ./ollama_data ./.claude
+# Pre-create host directories to ensure they're not owned by root
+mkdir -p ./ollama_data "$CLAUDE_HOME"
 docker compose up -d
 
 echo "Waiting for Ollama server to initialize..."
