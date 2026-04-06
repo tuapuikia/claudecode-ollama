@@ -31,6 +31,9 @@ echo "Found latest version: $LATEST_TAG"
 VERSION_TAG="tuapuikia/ollama:claude-$LATEST_TAG"
 LATEST_FLAVOR_TAG="tuapuikia/ollama:claude"
 
+# Update Dockerfile to match the latest tag (ensures consistency)
+sed -i "s/^ARG OLLAMA_TAG=.*/ARG OLLAMA_TAG=$LATEST_TAG/" Dockerfile
+
 # Update .env file for docker-compose to use the specific versioned tag
 echo "Updating .env with OLLAMA_IMAGE_TAG=$VERSION_TAG..."
 echo "OLLAMA_IMAGE_TAG=$VERSION_TAG" > .env

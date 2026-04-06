@@ -185,10 +185,27 @@ if [ ! -f .env ]; then
     touch .env
 fi
 
-# Set the image tag if it doesn't exist
-if ! grep -q "OLLAMA_IMAGE_TAG" .env; then
-    DEFAULT_TAG=$(grep "ARG OLLAMA_TAG=" Dockerfile | cut -d'=' -f2)
-    echo "OLLAMA_IMAGE_TAG=tuapuikia/ollama:claude-$DEFAULT_TAG" >> .env
+# Fetch the latest tag logic from build.sh (ensures consistency)
+echo "Checking for latest Ollama image tag..."
+REPO="ollama/ollama"
+LATEST_TAG=$(curl -s "https://hub.docker.com/v2/repositories/$REPO/tags/?page_size=100" | \
+    jq -r '.results[].name' | \
+    grep -vE 'latest|rocm|alpine|rc' | \
+    grep '^[0-9]' | \
+    head -n 1)
+
+if [ -z "$LATEST_TAG" ]; then
+    echo "Warning: Could not fetch latest tag from Docker Hub. Using fallback."
+    VERSION_TAG="tuapuikia/ollama:claude"
+else
+    VERSION_TAG="tuapuikia/ollama:claude-$LATEST_TAG"
+fi
+
+# Update or add the image tag variable
+if grep -q "OLLAMA_IMAGE_TAG" .env; then
+    sed -i "s|^OLLAMA_IMAGE_TAG=.*|OLLAMA_IMAGE_TAG=$VERSION_TAG|" .env
+else
+    echo "OLLAMA_IMAGE_TAG=$VERSION_TAG" >> .env
 fi
 
 # Update or add the Docker socket mount variable
