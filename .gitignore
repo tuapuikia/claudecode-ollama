@@ -2,3 +2,6 @@ ollama_data
 build.log
 .claude
 .env
+node_modules
+package.json
+package-lock.json
