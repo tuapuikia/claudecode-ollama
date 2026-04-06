@@ -1,2 +1,4 @@
 ollama_data
 build.log
+.claude
+.env

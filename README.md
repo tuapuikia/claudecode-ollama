@@ -1,45 +1,77 @@
-# Ollama with GPU support
+# Ollama & Claude Code Developer Environment
 
-This setup runs Ollama with NVIDIA GPU acceleration as a background service, exposing a full REST API for client applications.
+A powerful, containerized development environment that integrates local LLM hosting via **Ollama** with **Claude Code** (Anthropic's AI-powered coding agent). This environment is pre-configured with a modern DevOps and programming toolset, providing a unified workspace for AI-assisted engineering.
 
-## Requirements
-- NVIDIA Drivers installed
-- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) installed
+## 🚀 Features
 
-## Usage
+- **Local LLM Engine**: Host and run models like `gemma4`, `qwen3.5`, and `gemma2` locally using Ollama.
+- **Claude Code Integration**: Use Claude's specialized coding agent to interact with your codebase and local tools.
+- **Batteries-Included Toolset**:
+    - **Languages**: Go (1.24.5), Rust, Node.js (22.x), Python 3, Dart.
+    - **DevOps**: Terraform, Terragrunt, AWS CLI, Ansible, Ansible-Lint.
+    - **System**: Docker CLI, uv, weasyprint, youtube-dl.
+- **GPU Acceleration**: Built-in support for NVIDIA GPUs via Docker Compose.
+- **Persistent Storage**: Local volume mapping for model data and workspace persistence.
 
-### 1. Start the Background Service
-Run this script to select a model, pull it, and keep the container running in the background. 
+## 🛠 Prerequisites
+
+- **NVIDIA Drivers** installed
+- **[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)** installed
+- **Docker** and **Docker Compose**
+- `sudo` access (depending on your Docker socket permissions)
+
+## 📦 Setup & Usage
+
+### 1. Build the Environment
+Ensure your Docker images are built and tagged correctly. (Assuming a `build.sh` exists to tag images as `tuapuikia/ollama:claude` and `tuapuikia/claude-code:latest`).
+
+### 2. Start the Ollama Server
+Use the interactive startup script to select a model family and launch the background service.
+
 ```bash
-./start_ollama.sh
+./start_ollama.sh [--no-docker]
 ```
-*Note: This script also ensures the model stays loaded in GPU memory (`OLLAMA_KEEP_ALIVE=-1`).*
+- **Option 1 (Default)**: Starts the API server without pre-loading any models.
+- **Option 2**: Interactive model selection and pre-loading.
+- **--no-docker**: Optional flag to skip mounting the Docker socket (useful for enhanced security when Claude Code's container management features are not needed).
 
-### 2. Connect via API (Non-interactive)
-You can now connect any client or tool to `http://localhost:11434`.
+### 3. Interact with Models & Claude Code
+To run a local model shell or launch Claude Code inside the existing Ollama container:
 
-#### Example: Chat via `curl`
-```bash
-curl -X POST http://localhost:11434/api/generate -d '{
-  "model": "gemma4:latest",
-  "prompt": "Why is the sky blue?",
-  "stream": false
-}'
-```
-
-### 3. (Optional) Run Models Interactively
-If you want to quickly test a model in the terminal without using an external client:
 ```bash
 ./run_model.sh
 ```
+**Options:**
+- **Ollama Shell**: Direct interaction with the loaded model.
+- **Claude Code**: Launch Claude Code within the Ollama environment to leverage installed tools.
 
-### 4. Stop the Server
-When you are completely finished using Ollama, you can stop the background container:
+### 4. Standalone Claude Code
+To run Claude Code in a fresh, isolated container with access to your current directory and host Docker socket:
+
 ```bash
-docker compose stop
+./run_claude.sh
 ```
 
-## Configuration
-- Data is persisted in `./ollama_data`
-- Port `11434` is exposed for API access
-- The current directory (`.`) is mounted to `/workspace` inside the container for easy file access.
+## 📂 Project Structure
+
+- `Dockerfile`: Based on `ollama/ollama`, includes the full developer toolset.
+- `Dockerfile-claude`: A standalone Ubuntu 24.04-based developer environment.
+- `docker-compose.yml`: Defines the `ollama` service with GPU support and volume mounts.
+- `start_ollama.sh`: Interactive server initialization and model pre-loading.
+- `run_model.sh`: Interactive client for model shells and Claude Code.
+- `run_claude.sh`: Standalone Claude Code runner.
+- `ollama_data/`: Persistent storage for pulled Ollama models.
+- `.claude/`: Persistent storage for Claude Code login and session tokens.
+
+## ⚙️ Configuration
+
+- **Environment Variables**: Managed via `.env` (automatically updated by `start_ollama.sh`).
+- **User**: Runs as the `ubuntu` user (UID 1000) with passwordless `sudo` privileges inside the containers.
+- **Persistence**: Login tokens and models are stored in local hidden directories (`.claude/` and `ollama_data/`).
+- **Docker Support**: The host's `/var/run/docker.sock` is mounted to allow Claude Code to manage other containers.
+- **Workspace**: The project root is mounted to `/workspace` inside the containers with write access for coding tasks.
+- **API Access**: Port `11434` is exposed for REST API access.
+
+## 🛡 Security Note
+
+The environment mounts `/var/run/docker.sock` to allow containers to manage other Docker resources. Ensure you trust the scripts and models you are running in this environment.
