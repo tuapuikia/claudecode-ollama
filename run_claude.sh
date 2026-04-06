@@ -4,6 +4,7 @@
 cd "$(dirname "$0")"
 
 # Default values
+DOCKER_MODE="proxy" # proxy (default), host, none
 WORKSPACE_DIR="$(pwd)"
 CLAUDE_HOME="$HOME/.claude"
 
@@ -29,6 +30,9 @@ show_help() {
     echo ""
     echo "Options:"
     echo "  -h, --help            Show this help message"
+    echo "  --docker-proxy        Use a security proxy for Docker access (Default, safe)"
+    echo "  --host-docker-proxy   Mount direct host Docker socket (WARNING: Grant AI root access to host)"
+    echo "  --no-docker           Disable Docker access completely"
     echo "  --workspace <path>    Specify a custom workspace directory to mount (Default: current directory)"
     echo ""
 }
@@ -40,8 +44,21 @@ while [[ "$#" -gt 0 ]]; do
             show_help
             exit 0
             ;;
+        --docker-proxy)
+            DOCKER_MODE="proxy"
+            shift
+            ;;
+        --host-docker-proxy)
+            DOCKER_MODE="host"
+            shift
+            ;;
+        --no-docker)
+            DOCKER_MODE="none"
+            shift
+            ;;
         --workspace)
             if [[ -n "$2" ]]; then
+                # Resolve to absolute path
                 WORKSPACE_DIR=$(readlink -f "$2")
                 validate_workspace "$WORKSPACE_DIR"
                 shift 2
@@ -57,6 +74,56 @@ while [[ "$#" -gt 0 ]]; do
             ;;
     esac
 done
+
+# Cleanup function for proxy mode
+cleanup() {
+    if [ -n "$PROXY_NAME" ]; then
+        echo "------------------------------------------"
+        echo "Cleaning up independent security proxy..."
+        docker stop "$PROXY_NAME" > /dev/null 2>&1
+        docker rm "$PROXY_NAME" > /dev/null 2>&1
+        docker network rm "$NET_NAME" > /dev/null 2>&1
+    fi
+}
+
+# Set variables based on Docker mode
+case $DOCKER_MODE in
+    host)
+        echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+        echo "WARNING: You are granting the AI agent DIRECT access to the"
+        echo "host Docker socket. This is equivalent to root access on your"
+        echo "host machine. Use only with trusted models and prompts."
+        echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+        sleep 2
+        DOCKER_MOUNT_ARG="-v /var/run/docker.sock:/var/run/docker.sock"
+        DOCKER_ENV_ARG=""
+        ;;
+    proxy)
+        # Create a temporary independent network and proxy
+        SESSION_ID=$(date +%s)
+        PROXY_NAME="claude-proxy-$SESSION_ID"
+        NET_NAME="claude-net-$SESSION_ID"
+        
+        echo "Starting independent security proxy ($PROXY_NAME)..."
+        docker network create "$NET_NAME" > /dev/null
+        docker run -d --name "$PROXY_NAME" \
+            --network "$NET_NAME" \
+            -v /var/run/docker.sock:/var/run/docker.sock:ro \
+            -e CONTAINERS=1 -e IMAGES=1 -e NETWORKS=1 -e VOLUMES=1 -e BUILD=1 -e AUTH=1 -e POST=1 -e EXEC=1 -e ALLOW_BIND_MOUNTS=1 \
+            tecnativa/docker-socket-proxy > /dev/null
+            
+        DOCKER_MOUNT_ARG=""
+        # Enforce DOCKER_BUILDKIT=0 for maximum compatibility with restricted proxy
+        DOCKER_ENV_ARG="-e DOCKER_HOST=tcp://$PROXY_NAME:2375 -e DOCKER_BUILDKIT=0 --network $NET_NAME"
+        
+        # Ensure cleanup on exit or interrupt
+        trap cleanup EXIT INT TERM
+        ;;
+    *)
+        DOCKER_MOUNT_ARG=""
+        DOCKER_ENV_ARG=""
+        ;;
+esac
 
 IMAGE="tuapuikia/claude-code:latest"
 
@@ -81,14 +148,14 @@ esac
 echo "------------------------------------------"
 echo "Launching container..."
 echo "Image:     $IMAGE"
-echo "Socket:    /var/run/docker.sock"
+echo "Docker Mode: $DOCKER_MODE"
 echo "Workspace: $WORKSPACE_DIR"
 echo "Claude session: $CLAUDE_HOME"
 echo "------------------------------------------"
 
-# Determine if sudo is needed for docker socket access
+# Determine if sudo is needed for docker socket access (only for host mode)
 DOCKER_CMD="docker"
-if [ ! -w /var/run/docker.sock ]; then
+if [ ! -w /var/run/docker.sock ] && [ "$DOCKER_MODE" == "host" ]; then
     echo "Note: /var/run/docker.sock is not writable by current user. Using sudo..."
     DOCKER_CMD="sudo docker"
 fi
@@ -96,16 +163,18 @@ fi
 # Run the container
 # --rm: Automatically remove the container when it exits
 # -it: Interactive terminal
-# -v /var/run/docker.sock: Allow Claude to manage other containers
 # -v "$WORKSPACE_DIR":/workspace: Mount custom directory to the container's workspace (RW)
 # -v "$CLAUDE_HOME":/home/ubuntu/.claude: Persist Claude login and session info from host home
+# -v "$HOME/.docker":/home/ubuntu/.docker:ro: Share host Docker credentials (Read-Only)
 # --workdir /workspace: Ensure we start in the mounted directory
 mkdir -p "$CLAUDE_HOME"
 $DOCKER_CMD run -it --rm \
     --name claude-runner \
-    -v /var/run/docker.sock:/var/run/docker.sock \
+    $DOCKER_MOUNT_ARG \
+    $DOCKER_ENV_ARG \
     -v "$WORKSPACE_DIR:/workspace" \
     -v "$CLAUDE_HOME:/home/ubuntu/.claude" \
+    -v "$HOME/.docker:/home/ubuntu/.docker:ro" \
     --workdir /workspace \
     "$IMAGE" \
     $COMMAND

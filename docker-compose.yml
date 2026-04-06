@@ -1,4 +1,23 @@
 services:
+  # Security proxy for Docker socket (Fix for VULN-001)
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy
+    container_name: docker-proxy
+    privileged: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - CONTAINERS=1
+      - IMAGES=1
+      - NETWORKS=1
+      - VOLUMES=1
+      - BUILD=1
+      - AUTH=1
+      - POST=1
+      - EXEC=1 # Allow docker exec for testing
+      - ALLOW_BIND_MOUNTS=1
+    restart: unless-stopped
+
   ollama:
     image: ${OLLAMA_IMAGE_TAG:-tuapuikia/ollama:claude}
     pull_policy: always
@@ -9,7 +28,8 @@ services:
     volumes:
       - ./ollama_data:/home/ubuntu/.ollama
       - ${OLLAMA_CLAUDE_HOME:-./.claude}:/home/ubuntu/.claude
-      - ${OLLAMA_DOCKER_MOUNT:-/var/run/docker.sock}:/var/run/docker.sock
+      - ${HOME}/.docker:/home/ubuntu/.docker:ro
+      - ${OLLAMA_DOCKER_MOUNT:-/dev/null}:/var/run/docker.sock
       - ${OLLAMA_WORKSPACE:-.}:/workspace
     deploy:
       resources:
@@ -21,4 +41,8 @@ services:
     environment:
       - OLLAMA_HOST=0.0.0.0
       - OLLAMA_KEEP_ALIVE=-1
+      - DOCKER_HOST=${OLLAMA_DOCKER_HOST:-}
+      - DOCKER_BUILDKIT=0 # ENFORCE LEGACY BUILD METHOD
+    depends_on:
+      - docker-proxy
     restart: unless-stopped

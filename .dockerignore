@@ -1,0 +1,5 @@
+ollama_data/
+.claude/
+.git/
+.gemini_security/
+*.log

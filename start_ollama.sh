@@ -4,7 +4,7 @@
 cd "$(dirname "$0")"
 
 # Default values
-DOCKER_MOUNT="/var/run/docker.sock"
+DOCKER_MODE="proxy" # proxy (default), host, none
 WORKSPACE_DIR="$(pwd)"
 CLAUDE_HOME="$HOME/.claude"
 
@@ -30,7 +30,9 @@ show_help() {
     echo ""
     echo "Options:"
     echo "  -h, --help            Show this help message"
-    echo "  --no-docker           Disable mounting the host Docker socket"
+    echo "  --docker-proxy        Use a security proxy for Docker access (Default, safe)"
+    echo "  --host-docker-proxy   Mount direct host Docker socket (WARNING: Grant AI root access to host)"
+    echo "  --no-docker           Disable Docker access completely"
     echo "  --workspace <path>    Specify a custom workspace directory to mount (Default: current directory)"
     echo ""
 }
@@ -42,8 +44,16 @@ while [[ "$#" -gt 0 ]]; do
             show_help
             exit 0
             ;;
+        --docker-proxy)
+            DOCKER_MODE="proxy"
+            shift
+            ;;
+        --host-docker-proxy)
+            DOCKER_MODE="host"
+            shift
+            ;;
         --no-docker)
-            DOCKER_MOUNT="/dev/null"
+            DOCKER_MODE="none"
             shift
             ;;
         --workspace)
@@ -64,6 +74,28 @@ while [[ "$#" -gt 0 ]]; do
             ;;
     esac
 done
+
+# Set variables based on Docker mode
+case $DOCKER_MODE in
+    host)
+        echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+        echo "WARNING: You are granting the AI agent DIRECT access to the"
+        echo "host Docker socket. This is equivalent to root access on your"
+        echo "host machine. Use only with trusted models and prompts."
+        echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+        sleep 2
+        DOCKER_MOUNT="/var/run/docker.sock"
+        DOCKER_HOST_VAL=""
+        ;;
+    proxy)
+        DOCKER_MOUNT="/dev/null"
+        DOCKER_HOST_VAL="tcp://docker-proxy:2375"
+        ;;
+    *)
+        DOCKER_MOUNT="/dev/null"
+        DOCKER_HOST_VAL=""
+        ;;
+esac
 
 echo "------------------------------------------"
 echo "Select startup mode:"
@@ -161,10 +193,16 @@ fi
 
 # Update or add the Docker socket mount variable
 if grep -q "OLLAMA_DOCKER_MOUNT" .env; then
-    # Use sed to update existing variable
     sed -i "s|^OLLAMA_DOCKER_MOUNT=.*|OLLAMA_DOCKER_MOUNT=$DOCKER_MOUNT|" .env
 else
     echo "OLLAMA_DOCKER_MOUNT=$DOCKER_MOUNT" >> .env
+fi
+
+# Update or add the Docker host variable (proxy mode)
+if grep -q "OLLAMA_DOCKER_HOST" .env; then
+    sed -i "s|^OLLAMA_DOCKER_HOST=.*|OLLAMA_DOCKER_HOST=$DOCKER_HOST_VAL|" .env
+else
+    echo "OLLAMA_DOCKER_HOST=$DOCKER_HOST_VAL" >> .env
 fi
 
 # Update or add the Workspace directory variable
@@ -186,6 +224,7 @@ fi
 echo "------------------------------------------"
 echo "Launching with workspace: $WORKSPACE_DIR"
 echo "Claude session: $CLAUDE_HOME"
+echo "Docker Mode: $DOCKER_MODE"
 echo "------------------------------------------"
 echo "Starting Ollama container in the background..."
 # Pre-create host directories to ensure they're not owned by root
