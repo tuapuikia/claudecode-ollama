@@ -1,8 +1,23 @@
-FROM ollama/ollama:latest
+ARG OLLAMA_TAG=0.5.11
+FROM ollama/ollama:${OLLAMA_TAG}
 
 # Set environment variables for non-interactive installation
 ENV DEBIAN_FRONTEND=noninteractive
-ENV HOME=/root
+
+# Use the existing 'ubuntu' user (UID 1000)
+ENV HOME=/home/ubuntu
+
+# Set environment variables
+ENV OLLAMA_VULKAN=false
+ENV ROCR_VISIBLE_DEVICES=""
+ENV http_proxy=""
+ENV https_proxy=""
+ENV no_proxy=""
+
+WORKDIR /home/ubuntu
+
+# Ensure the .ollama directory exists and is owned by ubuntu
+RUN mkdir -p /home/ubuntu/.ollama && chown -R ubuntu:ubuntu /home/ubuntu/.ollama
 
 # Install dependencies for Claude Code and common tools
 RUN apt-get update && apt-get install -y \
@@ -11,14 +26,20 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Claude Code using the official installer
-# We use 'yes' to handle any confirmation prompts during the install process
-RUN yes | curl -fsSL https://claude.ai/install.sh | bash
+# Set the working directory for the application and ensure ownership
+RUN mkdir -p /workspace && chown ubuntu:ubuntu /workspace
 
-# Ensure Claude Code is in the PATH (the installer usually puts it in ~/.local/bin)
-ENV PATH="/root/.local/bin:${PATH}"
+# Install Claude Code as the ubuntu user
+USER ubuntu
+WORKDIR /home/ubuntu
+RUN curl -fsSL https://claude.ai/install.sh -o /tmp/install.sh && \
+    chmod +x /tmp/install.sh && \
+    yes | /tmp/install.sh && \
+    rm /tmp/install.sh
 
-# Set the working directory
+# Ensure Claude Code is in the PATH
+ENV PATH="/home/ubuntu/.local/bin:${PATH}"
+
 WORKDIR /workspace
 
 # The entrypoint remains the same as the base ollama image to ensure the server starts correctly

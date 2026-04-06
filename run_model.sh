@@ -21,8 +21,8 @@ if [ "$mode_choice" == "2" ]; then
     echo "------------------------------------------"
     echo "Launching Claude Code with qwen3.5:latest..."
     # Ensure the model is pulled first to avoid timeout issues in Claude Code
-    docker exec -it ollama ollama pull qwen3.5:latest
-    docker exec -it ollama ollama launch claude --model qwen3.5:latest
+    docker exec -it -u ubuntu ollama ollama pull qwen3.5:latest
+    docker exec -it -u ubuntu ollama ollama launch claude --model qwen3.5:latest
     exit 0
 fi
 
@@ -113,6 +113,6 @@ FULL_MODEL_NAME="$FAMILY:$CLEAN_TAG"
 
 echo "------------------------------------------"
 echo "Entering $FULL_MODEL_NAME model shell..."
-docker exec -it ollama ollama run "$FULL_MODEL_NAME"
+docker exec -it -u ubuntu ollama ollama run "$FULL_MODEL_NAME"
 
 echo "Model shell exited. The Ollama container is still running in the background."

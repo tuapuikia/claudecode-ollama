@@ -75,8 +75,17 @@ fi
 CLEAN_TAG=$(echo "$SELECTED_TAG" | awk '{print $1}')
 FULL_MODEL_NAME="$FAMILY:$CLEAN_TAG"
 
+# Ensure the .env file exists and has the image tag
+if [ ! -f .env ] || ! grep -q "OLLAMA_IMAGE_TAG" .env; then
+    # Fallback to the default if not set by build.sh
+    DEFAULT_TAG=$(grep "ARG OLLAMA_TAG=" Dockerfile | cut -d'=' -f2)
+    echo "OLLAMA_IMAGE_TAG=tuapuikia/ollama:claude-$DEFAULT_TAG" > .env
+fi
+
 echo "------------------------------------------"
 echo "Starting Ollama container in the background..."
+# Pre-create data directory to ensure it's not owned by root
+mkdir -p ./ollama_data
 docker compose up -d
 
 echo "Waiting for Ollama server to initialize..."
@@ -92,7 +101,7 @@ done
 if [ $READY -eq 1 ]; then
     echo "Pulling $FULL_MODEL_NAME..."
     # We use 'pull' here so the server is ready for the interactive run later
-    docker exec ollama ollama pull "$FULL_MODEL_NAME"
+    docker exec -u ubuntu ollama ollama pull "$FULL_MODEL_NAME"
     echo "------------------------------------------"
     echo "Ollama is ready and $FULL_MODEL_NAME is loaded."
     echo "Run ./run_model.sh to enter the shell."
