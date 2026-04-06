@@ -57,3 +57,23 @@ fi
 echo "------------------------------------------"
 echo "Build complete: $DEST_IMAGE (based on $REPO:$LATEST_TAG)"
 echo "------------------------------------------"
+
+# Build and push the Claude-only image
+CLAUDE_DEST_IMAGE="tuapuikia/claude-code:latest"
+echo "------------------------------------------"
+echo "Building and pushing $CLAUDE_DEST_IMAGE..."
+echo "------------------------------------------"
+
+if groups | grep -q "\bdocker\b"; then
+    docker buildx build --push \
+        -t "$CLAUDE_DEST_IMAGE" \
+        -f Dockerfile-claude .
+else
+    sudo docker buildx build --push \
+        -t "$CLAUDE_DEST_IMAGE" \
+        -f Dockerfile-claude .
+fi
+
+echo "------------------------------------------"
+echo "Claude Code Build complete: $CLAUDE_DEST_IMAGE"
+echo "------------------------------------------"

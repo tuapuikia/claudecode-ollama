@@ -19,10 +19,35 @@ read -p "Choice [1-2]: " mode_choice
 
 if [ "$mode_choice" == "2" ]; then
     echo "------------------------------------------"
-    echo "Launching Claude Code with qwen3.5:latest..."
-    # Ensure the model is pulled first to avoid timeout issues in Claude Code
-    docker exec -it -u ubuntu ollama ollama pull qwen3.5:latest
-    docker exec -it -u ubuntu ollama ollama launch claude --model qwen3.5:latest
+    echo "Claude Code Options:"
+    echo "1) Launch with qwen3.5:latest (Default)"
+    echo "2) Launch without specifying a model"
+    echo "3) Launch with custom model"
+    echo "------------------------------------------"
+    read -p "Choice [1-3]: " claude_choice
+
+    if [ "$claude_choice" == "3" ]; then
+        read -p "Enter custom model name (e.g., gemma4:latest): " custom_model
+        if [ -n "$custom_model" ]; then
+            echo "------------------------------------------"
+            echo "Launching Claude Code with $custom_model..."
+            docker exec -it -u ubuntu ollama ollama pull "$custom_model"
+            docker exec -it -u ubuntu ollama ollama launch claude --model "$custom_model"
+        else
+            echo "No model entered. Defaulting to no model."
+            docker exec -it -u ubuntu ollama ollama launch claude
+        fi
+    elif [ "$claude_choice" == "2" ]; then
+        echo "------------------------------------------"
+        echo "Launching Claude Code..."
+        docker exec -it -u ubuntu ollama ollama launch claude
+    else
+        echo "------------------------------------------"
+        echo "Launching Claude Code with qwen3.5:latest..."
+        # Ensure the model is pulled first to avoid timeout issues in Claude Code
+        docker exec -it -u ubuntu ollama ollama pull qwen3.5:latest
+        docker exec -it -u ubuntu ollama ollama launch claude --model qwen3.5:latest
+    fi
     exit 0
 fi
 

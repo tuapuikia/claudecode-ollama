@@ -1,0 +1,77 @@
+# Use Ubuntu 24.04 as the base for a modern, lightweight dev environment
+FROM ubuntu:24.04
+
+# Set environment variables for non-interactive installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Essential system environment
+ENV HOME=/home/ubuntu
+ENV PATH="/home/ubuntu/.cargo/bin:/home/ubuntu/.local/bin:/usr/local/go/bin:${PATH}"
+
+# Install core utilities and dependencies for repositories
+RUN apt-get update && apt-get install -y \
+    curl \
+    ca-certificates \
+    git \
+    gnupg \
+    lsb-release \
+    unzip \
+    python3 \
+    python3-pip \
+    python3-venv \
+    software-properties-common \
+    sudo \
+    vim \
+    && rm -rf /var/lib/apt/lists/*
+
+# Add repositories for Dart, Docker, and Node.js
+RUN curl -fsSL https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/dart.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/dart.gpg] https://storage.googleapis.com/download.dartlang.org/linux/debian stable main" | tee /etc/apt/sources.list.d/dart_stable.list > /dev/null && \
+    install -m 0755 -d /etc/apt/keyrings && \
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc && \
+    chmod a+r /etc/apt/keyrings/docker.asc && \
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+      $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+      tee /etc/apt/sources.list.d/docker.list > /dev/null && \
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+
+# Install programming language runtimes and CLI tools
+RUN apt-get update && apt-get install -y \
+    dart \
+    docker-ce-cli \
+    docker-compose-plugin \
+    nodejs \
+    && apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Go (latest stable)
+RUN curl -LO https://go.dev/dl/go1.24.5.linux-amd64.tar.gz && \
+    rm -rf /usr/local/go && \
+    tar -C /usr/local -xzf go1.24.5.linux-amd64.tar.gz && \
+    rm go1.24.5.linux-amd64.tar.gz
+
+# Configure sudo for the 'ubuntu' user (exists by default in Ubuntu 24.04 image)
+RUN echo "ubuntu ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+# Create workspace directory
+RUN mkdir -p /workspace && chown ubuntu:ubuntu /workspace
+
+# Switch to non-root user
+USER ubuntu
+WORKDIR /home/ubuntu
+
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+# Install Claude Code
+RUN curl -fsSL https://claude.ai/install.sh -o /tmp/install.sh && \
+    echo "431889ac7d056f636aaf5b71524666d04c89c45560f80329940846479d484778  /tmp/install.sh" | sha256sum -c - && \
+    chmod +x /tmp/install.sh && \
+    yes | /tmp/install.sh && \
+    rm /tmp/install.sh
+
+WORKDIR /workspace
+
+# Default command
+CMD ["/bin/bash"]
