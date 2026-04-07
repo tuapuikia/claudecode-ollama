@@ -7,6 +7,7 @@ cd "$(dirname "$0")"
 DOCKER_MODE="proxy" # proxy (default), host, none
 WORKSPACE_DIR="$(pwd)"
 CLAUDE_HOME="$HOME/.claude"
+OLLAMA_CONTEXT_LENGTH="64000"
 
 # Function to validate the workspace path (Fix VULN-002)
 validate_workspace() {
@@ -34,6 +35,7 @@ show_help() {
     echo "  --host-docker-proxy   Mount direct host Docker socket (WARNING: Grant AI root access to host)"
     echo "  --no-docker           Disable Docker access completely"
     echo "  --workspace <path>    Specify a custom workspace directory to mount (Default: current directory)"
+    echo "  --context-length <n>  Set the Ollama context length (Default: 64000)"
     echo ""
 }
 
@@ -64,6 +66,15 @@ while [[ "$#" -gt 0 ]]; do
                 shift 2
             else
                 echo "Error: --workspace requires a path."
+                exit 1
+            fi
+            ;;
+        --context-length|-c)
+            if [[ -n "$2" ]]; then
+                OLLAMA_CONTEXT_LENGTH="$2"
+                shift 2
+            else
+                echo "Error: --context-length requires a value."
                 exit 1
             fi
             ;;
@@ -236,6 +247,13 @@ if grep -q "OLLAMA_CLAUDE_HOME" .env; then
     sed -i "s|^OLLAMA_CLAUDE_HOME=.*|OLLAMA_CLAUDE_HOME=$CLAUDE_HOME|" .env
 else
     echo "OLLAMA_CLAUDE_HOME=$CLAUDE_HOME" >> .env
+fi
+
+# Update or add the Ollama context length variable
+if grep -q "OLLAMA_CONTEXT_LENGTH" .env; then
+    sed -i "s|^OLLAMA_CONTEXT_LENGTH=.*|OLLAMA_CONTEXT_LENGTH=$OLLAMA_CONTEXT_LENGTH|" .env
+else
+    echo "OLLAMA_CONTEXT_LENGTH=$OLLAMA_CONTEXT_LENGTH" >> .env
 fi
 
 echo "------------------------------------------"
