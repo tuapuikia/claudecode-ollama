@@ -1,10 +1,12 @@
 #!/bin/bash
 
 # Default values
-WORKSPACE_DIR="$(pwd)"
+ORIGINAL_PWD="$(pwd)"
+WORKSPACE_DIR="$ORIGINAL_PWD"
 DOCKER_MODE="proxy" # proxy (default), host, none
 CLAUDE_HOME="$HOME/.claude"
 OLLAMA_CONTEXT_LENGTH="64000"
+CUSTOM_ENV_FILE=""
 
 # Ensure we are executing from the directory where the script lives
 cd "$(dirname "$0")"
@@ -35,6 +37,7 @@ show_help() {
     echo "  --host-docker-proxy   Mount direct host Docker socket (WARNING: Grant AI root access to host)"
     echo "  --no-docker           Disable Docker access completely"
     echo "  --workspace <path>    Specify a custom workspace directory to mount (Default: current directory)"
+    echo "  --env-file <path>     Specify a custom .env file to use"
     echo "  --context-length <n>  Set the Ollama context length (Default: 64000)"
     echo ""
 }
@@ -66,6 +69,16 @@ while [[ "$#" -gt 0 ]]; do
                 shift 2
             else
                 echo "Error: --workspace requires a path."
+                exit 1
+            fi
+            ;;
+        --env-file)
+            if [[ -n "$2" ]]; then
+                # Resolve to absolute path
+                CUSTOM_ENV_FILE=$(readlink -f "$2")
+                shift 2
+            else
+                echo "Error: --env-file requires a path."
                 exit 1
             fi
             ;;
@@ -136,10 +149,21 @@ case $DOCKER_MODE in
         ;;
 esac
 
-# Check for .env file in workspace
+# Check for .env file
 ENV_FILE_ARG=""
-if [ -f "$WORKSPACE_DIR/.env" ]; then
-    echo "Info: Found .env file in workspace. Mounting as environment variables."
+if [[ -n "$CUSTOM_ENV_FILE" ]]; then
+    if [ -f "$CUSTOM_ENV_FILE" ]; then
+        echo "Info: Using specified .env file: $CUSTOM_ENV_FILE"
+        ENV_FILE_ARG="--env-file $CUSTOM_ENV_FILE"
+    else
+        echo "Error: Specified .env file '$CUSTOM_ENV_FILE' not found."
+        exit 1
+    fi
+elif [ -f "$ORIGINAL_PWD/.env" ]; then
+    echo "Info: Found .env file in current directory ($ORIGINAL_PWD). Mounting as environment variables."
+    ENV_FILE_ARG="--env-file $ORIGINAL_PWD/.env"
+elif [ -f "$WORKSPACE_DIR/.env" ]; then
+    echo "Info: Found .env file in workspace ($WORKSPACE_DIR). Mounting as environment variables."
     ENV_FILE_ARG="--env-file $WORKSPACE_DIR/.env"
 fi
 
