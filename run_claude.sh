@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# Ensure we are executing from the directory where the script lives
-cd "$(dirname "$0")"
-
 # Default values
-DOCKER_MODE="proxy" # proxy (default), host, none
 WORKSPACE_DIR="$(pwd)"
+DOCKER_MODE="proxy" # proxy (default), host, none
 CLAUDE_HOME="$HOME/.claude"
 OLLAMA_CONTEXT_LENGTH="64000"
+
+# Ensure we are executing from the directory where the script lives
+cd "$(dirname "$0")"
 
 # Function to validate the workspace path (Fix VULN-002)
 validate_workspace() {
@@ -136,6 +136,13 @@ case $DOCKER_MODE in
         ;;
 esac
 
+# Check for .env file in workspace
+ENV_FILE_ARG=""
+if [ -f "$WORKSPACE_DIR/.env" ]; then
+    echo "Info: Found .env file in workspace. Mounting as environment variables."
+    ENV_FILE_ARG="--env-file $WORKSPACE_DIR/.env"
+fi
+
 IMAGE="tuapuikia/claude-code:latest"
 
 # Check if the image exists locally, or pull it
@@ -172,17 +179,14 @@ if [ ! -w /var/run/docker.sock ] && [ "$DOCKER_MODE" == "host" ]; then
 fi
 
 # Run the container
-# --rm: Automatically remove the container when it exits
-# -it: Interactive terminal
-# -v "$WORKSPACE_DIR":/workspace: Mount custom directory to the container's workspace (RW)
-# -v "$CLAUDE_HOME":/home/ubuntu/.claude: Persist Claude login and session info from host home
-# -v "$HOME/.docker":/home/ubuntu/.docker:ro: Share host Docker credentials (Read-Only)
-# --workdir /workspace: Ensure we start in the mounted directory
 mkdir -p "$CLAUDE_HOME"
 $DOCKER_CMD run -it --rm \
-    --name claude-runner \
+    --init \
+    --add-host=host.docker.internal:host-gateway \
+    --name "claude-runner-$(date +%s)" \
     $DOCKER_MOUNT_ARG \
     $DOCKER_ENV_ARG \
+    $ENV_FILE_ARG \
     -e OLLAMA_CONTEXT_LENGTH="$OLLAMA_CONTEXT_LENGTH" \
     -v "$WORKSPACE_DIR:/workspace" \
     -v "$CLAUDE_HOME:/home/ubuntu/.claude" \
