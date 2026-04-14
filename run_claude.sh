@@ -150,21 +150,21 @@ case $DOCKER_MODE in
 esac
 
 # Check for .env file
-ENV_FILE_ARG=""
+ENV_FILE_ARGS=()
 if [[ -n "$CUSTOM_ENV_FILE" ]]; then
     if [ -f "$CUSTOM_ENV_FILE" ]; then
         echo "Info: Using specified .env file: $CUSTOM_ENV_FILE"
-        ENV_FILE_ARG="--env-file $CUSTOM_ENV_FILE"
+        ENV_FILE_ARGS=("--env-file" "$CUSTOM_ENV_FILE")
     else
         echo "Error: Specified .env file '$CUSTOM_ENV_FILE' not found."
         exit 1
     fi
 elif [ -f "$ORIGINAL_PWD/.env" ]; then
     echo "Info: Found .env file in current directory ($ORIGINAL_PWD). Mounting as environment variables."
-    ENV_FILE_ARG="--env-file $ORIGINAL_PWD/.env"
+    ENV_FILE_ARGS=("--env-file" "$ORIGINAL_PWD/.env")
 elif [ -f "$WORKSPACE_DIR/.env" ]; then
     echo "Info: Found .env file in workspace ($WORKSPACE_DIR). Mounting as environment variables."
-    ENV_FILE_ARG="--env-file $WORKSPACE_DIR/.env"
+    ENV_FILE_ARGS=("--env-file" "$WORKSPACE_DIR/.env")
 fi
 
 IMAGE="tuapuikia/claude-code:latest"
@@ -210,7 +210,7 @@ $DOCKER_CMD run -it --rm \
     --name "claude-runner-$(date +%s)" \
     $DOCKER_MOUNT_ARG \
     $DOCKER_ENV_ARG \
-    $ENV_FILE_ARG \
+    "${ENV_FILE_ARGS[@]}" \
     -e OLLAMA_CONTEXT_LENGTH="$OLLAMA_CONTEXT_LENGTH" \
     -v "$WORKSPACE_DIR:/workspace" \
     -v "$CLAUDE_HOME:/home/ubuntu/.claude" \
