@@ -170,11 +170,9 @@ fi
 
 IMAGE="tuapuikia/claude-code:latest"
 
-# Check if the image exists locally, or pull it
-if [[ "$(docker images -q $IMAGE 2> /dev/null)" == "" ]]; then
-    echo "Image $IMAGE not found locally. Attempting to pull..."
-    docker pull "$IMAGE"
-fi
+# Always check for the latest image before running
+echo "Checking for latest image: $IMAGE..."
+docker pull "$IMAGE"
 
 echo "------------------------------------------"
 echo "Select operation mode for Claude Code:"
