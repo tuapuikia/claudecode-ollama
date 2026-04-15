@@ -5,6 +5,7 @@ ORIGINAL_PWD="$(pwd)"
 WORKSPACE_DIR="$ORIGINAL_PWD"
 DOCKER_MODE="proxy" # proxy (default), host, none
 CLAUDE_HOME="$HOME/.claude"
+CLAUDE_CONFIG="$HOME/.claude.json"
 OLLAMA_CONTEXT_LENGTH="64000"
 CUSTOM_ENV_FILE=""
 
@@ -193,6 +194,7 @@ echo "Image:     $IMAGE"
 echo "Docker Mode: $DOCKER_MODE"
 echo "Workspace: $WORKSPACE_DIR"
 echo "Claude session: $CLAUDE_HOME"
+echo "Claude config: $CLAUDE_CONFIG"
 echo "------------------------------------------"
 
 # Determine if sudo is needed for docker socket access (only for host mode)
@@ -204,6 +206,7 @@ fi
 
 # Run the container
 mkdir -p "$CLAUDE_HOME"
+[ ! -f "$CLAUDE_CONFIG" ] && touch "$CLAUDE_CONFIG"
 $DOCKER_CMD run -it --rm \
     --init \
     --add-host=host.docker.internal:host-gateway \
@@ -214,6 +217,7 @@ $DOCKER_CMD run -it --rm \
     -e OLLAMA_CONTEXT_LENGTH="$OLLAMA_CONTEXT_LENGTH" \
     -v "$WORKSPACE_DIR:/workspace" \
     -v "$CLAUDE_HOME:/home/ubuntu/.claude" \
+    -v "$CLAUDE_CONFIG:/home/ubuntu/.claude.json:rw" \
     -v "$HOME/.docker:/home/ubuntu/.docker:ro" \
     --workdir /workspace \
     "$IMAGE" \
