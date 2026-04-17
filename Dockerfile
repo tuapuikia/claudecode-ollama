@@ -19,8 +19,11 @@ WORKDIR /home/ubuntu
 # Ensure the .ollama directory exists and is owned by ubuntu
 RUN mkdir -p /home/ubuntu/.ollama && chown -R ubuntu:ubuntu /home/ubuntu/.ollama
 
-# Install dependencies for repositories and common tools
-RUN apt-get update && apt-get install -y \
+# Install core utilities, add repositories, and install packages in one layer
+# Override default Ubuntu apt repository with Azure mirror since original is down
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu/|http://azure.archive.ubuntu.com/ubuntu/|g' /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null || true && \
+    sed -i 's|http://security.ubuntu.com/ubuntu/|http://azure.archive.ubuntu.com/ubuntu/|g' /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null || true && \
+    apt-get update && apt-get install -y \
     curl \
     ca-certificates \
     git \
@@ -32,11 +35,8 @@ RUN apt-get update && apt-get install -y \
     python3-venv \
     software-properties-common \
     sudo \
-    vim \
-    && rm -rf /var/lib/apt/lists/*
-
-# Add repositories for Dart, Terraform, Docker, and Node.js
-RUN curl -fsSL https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/dart.gpg && \
+    vim && \
+    curl -fsSL https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/dart.gpg && \
     echo "deb [signed-by=/usr/share/keyrings/dart.gpg] https://storage.googleapis.com/download.dartlang.org/linux/debian stable main" | tee /etc/apt/sources.list.d/dart_stable.list > /dev/null && \
     curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg && \
     chmod a+r /usr/share/keyrings/hashicorp-archive-keyring.gpg && \
@@ -48,10 +48,8 @@ RUN curl -fsSL https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dea
       "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
       $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
       tee /etc/apt/sources.list.d/docker.list > /dev/null && \
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-
-# Install packages from the added repositories
-RUN apt-get update && apt-get install -y \
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get update && apt-get install -y \
     terraform \
     dart \
     docker-ce-cli \
