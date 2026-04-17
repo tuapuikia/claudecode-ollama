@@ -12,21 +12,32 @@ CUSTOM_ENV_FILE=""
 # Ensure we are executing from the directory where the script lives
 cd "$(dirname "$0")"
 
-# Function to validate the workspace path (Fix VULN-002)
+# Function to validate the workspace path (Fix VULN-004)
 validate_workspace() {
-    local path="$1"
+    local path=$(readlink -f "$1")
     # Ensure the path exists and is a directory
     if [ ! -d "$path" ]; then
         echo "Error: Workspace path '$path' does not exist or is not a directory."
         exit 1
     fi
-    # Security check: avoid mounting sensitive system directories
-    case "$path" in
-        /|/etc|/etc/|/root|/root/|/boot|/boot/|/sys|/sys/)
+
+    # Sensitive system directories that should never be mounted
+    local sensitive_dirs=(
+        "/" "/etc" "/root" "/boot" "/sys" "/proc" "/dev" "/bin" "/sbin" "/lib" "/lib64" "/usr" "/var"
+    )
+
+    for dir in "${sensitive_dirs[@]}"; do
+        if [[ "$path" == "$dir" ]] || [[ "$path" == "$dir/"* ]]; then
             echo "Security Error: Mounting sensitive system directory '$path' as workspace is not allowed."
             exit 1
-            ;;
-    esac
+        fi
+    done
+
+    # Block user-sensitive directories
+    if [[ "$path" == "$HOME" ]] || [[ "$path" == "$HOME/.ssh"* ]] || [[ "$path" == "$HOME/.aws"* ]] || [[ "$path" == "$HOME/.gnupg"* ]] || [[ "$path" == "$HOME/.claude"* ]]; then
+        echo "Security Error: Mounting user sensitive directory '$path' as workspace is not allowed."
+        exit 1
+    fi
 }
 
 show_help() {
@@ -152,20 +163,23 @@ esac
 
 # Check for .env file
 ENV_FILE_ARGS=()
+ACTIVE_ENV_FILE=""
 if [[ -n "$CUSTOM_ENV_FILE" ]]; then
     if [ -f "$CUSTOM_ENV_FILE" ]; then
-        echo "Info: Using specified .env file: $CUSTOM_ENV_FILE"
-        ENV_FILE_ARGS=("--env-file" "$CUSTOM_ENV_FILE")
+        ACTIVE_ENV_FILE="$CUSTOM_ENV_FILE"
     else
         echo "Error: Specified .env file '$CUSTOM_ENV_FILE' not found."
         exit 1
     fi
 elif [ -f "$ORIGINAL_PWD/.env" ]; then
-    echo "Info: Found .env file in current directory ($ORIGINAL_PWD). Mounting as environment variables."
-    ENV_FILE_ARGS=("--env-file" "$ORIGINAL_PWD/.env")
+    ACTIVE_ENV_FILE="$ORIGINAL_PWD/.env"
 elif [ -f "$WORKSPACE_DIR/.env" ]; then
-    echo "Info: Found .env file in workspace ($WORKSPACE_DIR). Mounting as environment variables."
-    ENV_FILE_ARGS=("--env-file" "$WORKSPACE_DIR/.env")
+    ACTIVE_ENV_FILE="$WORKSPACE_DIR/.env"
+fi
+
+if [[ -n "$ACTIVE_ENV_FILE" ]]; then
+    echo "Info: Using .env file: $ACTIVE_ENV_FILE"
+    ENV_FILE_ARGS=("--env-file" "$ACTIVE_ENV_FILE")
 fi
 
 IMAGE="tuapuikia/claude-code:latest"
@@ -181,9 +195,33 @@ echo "2) Open Bash Shell"
 echo "------------------------------------------"
 read -p "Choice [1-2]: " mode_choice
 
+# Detect System Prompt File
+SYSTEM_PROMPT_FILE_PATH=""
+# Check ~/.claude/system.md first as a default if it exists
+if [ -f "$HOME/.claude/system.md" ]; then
+    SYSTEM_PROMPT_FILE_PATH="/home/ubuntu/.claude/system.md"
+fi
+
+# Override from .env file if present
+if [[ -n "$ACTIVE_ENV_FILE" ]]; then
+    # Try to extract SYSTEM_PROMPT_FILE from the .env file (case-insensitive)
+    # Sanitize the input to allow only safe path characters (Fix VULN-002)
+    ENV_SYSTEM_PROMPT=$(grep -i "^SYSTEM_PROMPT_FILE=" "$ACTIVE_ENV_FILE" | cut -d'=' -f2- | tr -d '"' | tr -d "'" | sed 's/[^a-zA-Z0-9._/ ~-]//g')
+    if [[ -n "$ENV_SYSTEM_PROMPT" ]]; then
+        SYSTEM_PROMPT_FILE_PATH="$ENV_SYSTEM_PROMPT"
+    fi
+fi
+
+# Build command as an array to prevent shell injection and handle spaces (Fix VULN-002)
 case $mode_choice in
-    2) COMMAND="/bin/bash" ;;
-    *) COMMAND="claude" ;;
+    2) COMMAND=("/bin/bash") ;;
+    *) 
+        COMMAND=("claude") 
+        if [[ -n "$SYSTEM_PROMPT_FILE_PATH" ]]; then
+            echo "Info: Using system prompt file: $SYSTEM_PROMPT_FILE_PATH"
+            COMMAND=("claude" "--system-prompt-file" "$SYSTEM_PROMPT_FILE_PATH")
+        fi
+        ;;
 esac
 
 echo "------------------------------------------"
@@ -219,7 +257,7 @@ $DOCKER_CMD run -it --rm \
     -v "$HOME/.docker:/home/ubuntu/.docker:ro" \
     --workdir /workspace \
     "$IMAGE" \
-    $COMMAND
+    "${COMMAND[@]}"
 
 echo "------------------------------------------"
 echo "Container session finished."

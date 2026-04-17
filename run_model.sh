@@ -28,6 +28,8 @@ if [ "$mode_choice" == "2" ]; then
 
     if [ "$claude_choice" == "3" ]; then
         read -p "Enter custom model name (e.g., gemma4:latest): " custom_model
+        # Sanitize input (Fix for potential shell injection)
+        custom_model=$(echo "$custom_model" | sed 's/[^a-zA-Z0-9._:/-]//g')
         if [ -n "$custom_model" ]; then
             echo "------------------------------------------"
             echo "Launching Claude Code with $custom_model..."

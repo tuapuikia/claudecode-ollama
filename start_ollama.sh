@@ -9,21 +9,32 @@ WORKSPACE_DIR="$(pwd)"
 CLAUDE_HOME="$HOME/.claude"
 OLLAMA_CONTEXT_LENGTH="64000"
 
-# Function to validate the workspace path (Fix VULN-002)
+# Function to validate the workspace path (Fix VULN-004)
 validate_workspace() {
-    local path="$1"
+    local path=$(readlink -f "$1")
     # Ensure the path exists and is a directory
     if [ ! -d "$path" ]; then
         echo "Error: Workspace path '$path' does not exist or is not a directory."
         exit 1
     fi
-    # Security check: avoid mounting sensitive system directories
-    case "$path" in
-        /|/etc|/etc/|/root|/root/|/boot|/boot/|/sys|/sys/)
+
+    # Sensitive system directories that should never be mounted
+    local sensitive_dirs=(
+        "/" "/etc" "/root" "/boot" "/sys" "/proc" "/dev" "/bin" "/sbin" "/lib" "/lib64" "/usr" "/var"
+    )
+
+    for dir in "${sensitive_dirs[@]}"; do
+        if [[ "$path" == "$dir" ]] || [[ "$path" == "$dir/"* ]]; then
             echo "Security Error: Mounting sensitive system directory '$path' as workspace is not allowed."
             exit 1
-            ;;
-    esac
+        fi
+    done
+
+    # Block user-sensitive directories
+    if [[ "$path" == "$HOME" ]] || [[ "$path" == "$HOME/.ssh"* ]] || [[ "$path" == "$HOME/.aws"* ]] || [[ "$path" == "$HOME/.gnupg"* ]] || [[ "$path" == "$HOME/.claude"* ]]; then
+        echo "Security Error: Mounting user sensitive directory '$path' as workspace is not allowed."
+        exit 1
+    fi
 }
 
 show_help() {
