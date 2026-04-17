@@ -24,7 +24,7 @@ RUN apt-get update && apt-get install -y \
     vim \
     && rm -rf /var/lib/apt/lists/*
 
-# Add repositories for Dart, Terraform, Docker, and Node.js
+# Add repositories for Dart, Terraform, Docker, Node.js, Helm, Kubernetes, Azure, and Google Cloud
 RUN curl -fsSL https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/dart.gpg && \
     echo "deb [signed-by=/usr/share/keyrings/dart.gpg] https://storage.googleapis.com/download.dartlang.org/linux/debian stable main" | tee /etc/apt/sources.list.d/dart_stable.list > /dev/null && \
     curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg && \
@@ -37,7 +37,15 @@ RUN curl -fsSL https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dea
       "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
       $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
       tee /etc/apt/sources.list.d/docker.list > /dev/null && \
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | gpg --dearmor -o /usr/share/keyrings/helm.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | tee /etc/apt/sources.list.d/helm-stable-debian.list && \
+    curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg && \
+    echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /" | tee /etc/apt/sources.list.d/kubernetes.list && \
+    curl -sLS https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /etc/apt/keyrings/microsoft.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/azure-cli.list && \
+    curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee /etc/apt/sources.list.d/google-cloud-sdk.list
 
 # Install packages from the added repositories
 RUN apt-get update && apt-get install -y \
@@ -46,11 +54,15 @@ RUN apt-get update && apt-get install -y \
     docker-ce-cli \
     docker-compose-plugin \
     nodejs \
+    azure-cli \
+    google-cloud-cli \
+    helm \
+    kubectl \
     && npx -y playwright install-deps \
     && apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Install AWS CLI, Terragrunt, and Go
+# Install AWS CLI, Terragrunt, Go, Helmfile, and Vals
 RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
     unzip awscliv2.zip && \
     ./aws/install && \
@@ -60,7 +72,17 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2
     curl -LO https://go.dev/dl/go1.24.5.linux-amd64.tar.gz && \
     rm -rf /usr/local/go && \
     tar -C /usr/local -xzf go1.24.5.linux-amd64.tar.gz && \
-    rm go1.24.5.linux-amd64.tar.gz
+    rm go1.24.5.linux-amd64.tar.gz && \
+    curl -sLo helmfile.tar.gz https://github.com/helmfile/helmfile/releases/download/v1.4.3/helmfile_1.4.3_linux_amd64.tar.gz && \
+    tar -xzf helmfile.tar.gz helmfile && \
+    mv helmfile /usr/local/bin/helmfile && \
+    chmod +x /usr/local/bin/helmfile && \
+    rm helmfile.tar.gz && \
+    curl -sLo vals.tar.gz https://github.com/helmfile/vals/releases/download/v0.43.7/vals_0.43.7_linux_amd64.tar.gz && \
+    tar -xzf vals.tar.gz vals && \
+    mv vals /usr/local/bin/vals && \
+    chmod +x /usr/local/bin/vals && \
+    rm vals.tar.gz
 
 # Set up Go and Python environment
 ENV PATH="/usr/local/go/bin:${PATH}"
