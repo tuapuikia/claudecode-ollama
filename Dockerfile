@@ -1,4 +1,4 @@
-ARG OLLAMA_TAG=0.20.7
+ARG OLLAMA_TAG=0.21.0
 FROM ollama/ollama:${OLLAMA_TAG}
 
 # Set environment variables for non-interactive installation
@@ -92,6 +92,9 @@ RUN curl -fsSL https://claude.ai/install.sh -o /tmp/install.sh && \
     chmod +x /tmp/install.sh && \
     yes | /tmp/install.sh && \
     rm /tmp/install.sh
+
+# Install specify-cli from spec-kit
+RUN uv tool install specify-cli --from git+https://github.com/github/spec-kit.git
 
 # Ensure Rust and Claude Code are in the PATH
 ENV PATH="/home/ubuntu/.cargo/bin:/home/ubuntu/.local/bin:${PATH}"
