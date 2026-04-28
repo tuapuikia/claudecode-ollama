@@ -8,6 +8,7 @@ CLAUDE_HOME="$HOME/.claude"
 CLAUDE_CONFIG="$HOME/.claude.json"
 OLLAMA_CONTEXT_LENGTH="64000"
 CUSTOM_ENV_FILE=""
+HOST_MAP=false
 
 # Ensure we are executing from the directory where the script lives
 cd "$(dirname "$0")"
@@ -51,6 +52,7 @@ show_help() {
     echo "  --workspace <path>    Specify a custom workspace directory to mount (Default: current directory)"
     echo "  --env-file <path>     Specify a custom .env file to use"
     echo "  --context-length <n>  Set the Ollama context length (Default: 64000)"
+    echo "  --hostmap             Mount host /etc/hosts to container /etc/hosts (read-only)"
     echo ""
 }
 
@@ -102,6 +104,10 @@ while [[ "$#" -gt 0 ]]; do
                 echo "Error: --context-length requires a value."
                 exit 1
             fi
+            ;;
+        --hostmap)
+            HOST_MAP=true
+            shift
             ;;
         *)
             echo "Unknown option: $1"
@@ -231,6 +237,7 @@ echo "Docker Mode: $DOCKER_MODE"
 echo "Workspace: $WORKSPACE_DIR"
 echo "Claude session: $CLAUDE_HOME"
 echo "Claude config: $CLAUDE_CONFIG"
+echo "Host Map:  $HOST_MAP"
 echo "------------------------------------------"
 
 # Determine if sudo is needed for docker socket access (only for host mode)
@@ -238,6 +245,16 @@ DOCKER_CMD="docker"
 if [ ! -w /var/run/docker.sock ] && [ "$DOCKER_MODE" == "host" ]; then
     echo "Note: /var/run/docker.sock is not writable by current user. Using sudo..."
     DOCKER_CMD="sudo docker"
+fi
+
+# Prepare hostmap mount if requested
+HOSTMAP_MOUNT_ARG=""
+if [ "$HOST_MAP" = true ]; then
+    if [ -f "/etc/hosts" ]; then
+        HOSTMAP_MOUNT_ARG="-v /etc/hosts:/etc/hosts:ro"
+    else
+        echo "Warning: /etc/hosts not found on host. Skipping hostmap."
+    fi
 fi
 
 # Run the container
@@ -249,6 +266,7 @@ $DOCKER_CMD run -it --rm \
     --name "claude-runner-$(date +%s)" \
     $DOCKER_MOUNT_ARG \
     $DOCKER_ENV_ARG \
+    $HOSTMAP_MOUNT_ARG \
     "${ENV_FILE_ARGS[@]}" \
     -e OLLAMA_CONTEXT_LENGTH="$OLLAMA_CONTEXT_LENGTH" \
     -v "$WORKSPACE_DIR:/workspace" \
