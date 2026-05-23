@@ -7,6 +7,14 @@ DOCKER_MODE="proxy" # proxy (default), host, none
 OLLAMA_CONTEXT_LENGTH="64000"
 CUSTOM_ENV_FILE=""
 HOST_MAP=false
+USE_GPU=true
+
+# Detect GPU support
+GPU_ARG=""
+if [ "$USE_GPU" = true ] && command -v nvidia-smi &> /dev/null; then
+    echo "NVIDIA GPU detected, enabling GPU support..."
+    GPU_ARG="--gpus all -e NVIDIA_VISIBLE_DEVICES=all -e NVIDIA_DRIVER_CAPABILITIES=all"
+fi
 
 # Determine AGY Config Directory on Host
 if [ -d "$HOME/.antigravity/.local" ]; then
@@ -79,6 +87,7 @@ show_help() {
     echo "  --docker-proxy        Use a security proxy for Docker access (Default, safe)"
     echo "  --host-docker-proxy   Mount direct host Docker socket (WARNING: Grant AI root access to host)"
     echo "  --no-docker           Disable Docker access completely"
+    echo "  --no-gpu              Disable GPU support"
     echo "  --workspace <path>    Specify a custom workspace directory to mount (Default: current directory)"
     echo "  --env-file <path>     Specify a custom .env file to use"
     echo "  --context-length <n>  Set the Ollama context length (Default: 64000)"
@@ -103,6 +112,11 @@ while [[ "$#" -gt 0 ]]; do
             ;;
         --no-docker)
             DOCKER_MODE="none"
+            shift
+            ;;
+        --no-gpu)
+            USE_GPU=false
+            GPU_ARG=""
             shift
             ;;
         --workspace)
@@ -245,6 +259,7 @@ echo "Workspace:   $WORKSPACE_DIR"
 echo "AGY Config:  $AGY_HOST_DIR"
 echo "AGY CLI:     $AGY_CLI_HOST_DIR"
 echo "Host Map:    $HOST_MAP"
+echo "GPU Support: ${GPU_ARG:-Disabled}"
 echo "------------------------------------------"
 
 # Determine if sudo is needed for docker socket access (only for host mode)
@@ -284,18 +299,6 @@ $DOCKER_CMD run -it --rm \
     -v "$AGY_CLI_HOST_DIR:/home/node/.gemini" \
     -v "$HOME/.docker:/home/node/.docker:ro" \
     --workdir /workspace \
-    "$IMAGE" \
-    "${COMMAND[@]}"
-
-echo "------------------------------------------"
-echo "Container session finished."
-echo "------------------------------------------"
-
-
-echo "------------------------------------------"
-echo "Container session finished."
-echo "------------------------------------------"
-r /workspace \
     "$IMAGE" \
     "${COMMAND[@]}"
 
