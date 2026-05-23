@@ -1,4 +1,4 @@
-ARG OLLAMA_TAG=0.22.0
+ARG OLLAMA_TAG=0.23.1
 FROM ollama/ollama:${OLLAMA_TAG}
 
 # Set environment variables for non-interactive installation
