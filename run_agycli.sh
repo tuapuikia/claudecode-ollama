@@ -13,7 +13,18 @@ USE_GPU=true
 GPU_ARG=""
 if [ "$USE_GPU" = true ] && command -v nvidia-smi &> /dev/null; then
     echo "NVIDIA GPU detected, enabling GPU support..."
-    GPU_ARG="--gpus all -e NVIDIA_VISIBLE_DEVICES=all -e NVIDIA_DRIVER_CAPABILITIES=all"
+    # Match Gemini container capabilities: gpus, sys-admin, and device groups
+    # Added /dev/dri and /dev/kvm for full hardware acceleration support
+    GPU_ARG="--gpus all \
+            --cap-add SYS_ADMIN \
+            --device /dev/dri:/dev/dri \
+            --device /dev/kvm:/dev/kvm \
+            --group-add 44 \
+            --group-add 992 \
+            --group-add 993 \
+            --ipc=host \
+            -e NVIDIA_VISIBLE_DEVICES=all \
+            -e NVIDIA_DRIVER_CAPABILITIES=all"
 fi
 
 # Determine AGY Config Directory on Host
