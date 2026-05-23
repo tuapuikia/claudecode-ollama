@@ -272,6 +272,7 @@ $DOCKER_CMD run -it --rm \
     -e HOME=/home/node \
     --add-host=host.docker.internal:host-gateway \
     --name "agy-runner-$(date +%s)" \
+    $GPU_ARG \
     $DOCKER_MOUNT_ARG \
     $DOCKER_ENV_ARG \
     $HOSTMAP_MOUNT_ARG \
@@ -283,6 +284,18 @@ $DOCKER_CMD run -it --rm \
     -v "$AGY_CLI_HOST_DIR:/home/node/.gemini" \
     -v "$HOME/.docker:/home/node/.docker:ro" \
     --workdir /workspace \
+    "$IMAGE" \
+    "${COMMAND[@]}"
+
+echo "------------------------------------------"
+echo "Container session finished."
+echo "------------------------------------------"
+
+
+echo "------------------------------------------"
+echo "Container session finished."
+echo "------------------------------------------"
+r /workspace \
     "$IMAGE" \
     "${COMMAND[@]}"
 
