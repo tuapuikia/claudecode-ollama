@@ -363,12 +363,12 @@ $DOCKER_CMD run -it --rm \
     $SANDBOX_FLAGS \
     "${ENV_FILE_ARGS[@]}" \
     -e OLLAMA_CONTEXT_LENGTH="$OLLAMA_CONTEXT_LENGTH" \
-    -v "$WORKSPACE_DIR:/workspace" \
+    -v "$WORKSPACE_DIR:$WORKSPACE_DIR" \
     -v "$AGY_HOME_HOST_DIR:/home/node" \
     -v "$AGY_HOST_DIR:/home/node/.antigravity" \
     -v "$AGY_CLI_HOST_DIR:/home/node/.gemini" \
     -v "$HOME/.docker:/home/node/.docker:ro" \
-    --workdir /workspace \
+    --workdir "$WORKSPACE_DIR" \
     "$IMAGE" \
     "${COMMAND[@]}"
 

@@ -283,11 +283,11 @@ $DOCKER_CMD run -it --rm \
     $HOSTMAP_MOUNT_ARG \
     "${ENV_FILE_ARGS[@]}" \
     -e OLLAMA_CONTEXT_LENGTH="$OLLAMA_CONTEXT_LENGTH" \
-    -v "$WORKSPACE_DIR:/workspace" \
+    -v "$WORKSPACE_DIR:$WORKSPACE_DIR" \
     -v "$CLAUDE_HOME:/home/ubuntu/.claude" \
     -v "$CLAUDE_CONFIG:/home/ubuntu/.claude.json:rw" \
     -v "$HOME/.docker:/home/ubuntu/.docker:ro" \
-    --workdir /workspace \
+    --workdir "$WORKSPACE_DIR" \
     "$IMAGE" \
     "${COMMAND[@]}"
 
