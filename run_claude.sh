@@ -9,6 +9,7 @@ CLAUDE_CONFIG="$HOME/.claude.json"
 OLLAMA_CONTEXT_LENGTH="64000"
 CUSTOM_ENV_FILE=""
 HOST_MAP=false
+INTERACTIVE=false
 
 # Ensure we are executing from the directory where the script lives
 cd "$(dirname "$0")"
@@ -46,6 +47,7 @@ show_help() {
     echo ""
     echo "Options:"
     echo "  -h, --help            Show this help message"
+    echo "  --interactive         Prompt menu to select operation mode"
     echo "  --docker-proxy        Use a security proxy for Docker access (Default, safe)"
     echo "  --host-docker-proxy   Mount direct host Docker socket (WARNING: Grant AI root access to host)"
     echo "  --no-docker           Disable Docker access completely"
@@ -62,6 +64,10 @@ while [[ "$#" -gt 0 ]]; do
         -h|--help)
             show_help
             exit 0
+            ;;
+        --interactive)
+            INTERACTIVE=true
+            shift
             ;;
         --docker-proxy)
             DOCKER_MODE="proxy"
@@ -194,13 +200,6 @@ IMAGE="tuapuikia/claude-code:latest"
 echo "Checking for latest image: $IMAGE..."
 docker pull "$IMAGE"
 
-echo "------------------------------------------"
-echo "Select operation mode for Claude Code:"
-echo "1) Launch Claude CLI (Default)"
-echo "2) Open Bash Shell"
-echo "------------------------------------------"
-read -p "Choice [1-2]: " mode_choice
-
 # Detect System Prompt File
 SYSTEM_PROMPT_FILE_PATH=""
 # Check ~/.claude/system.md first as a default if it exists
@@ -218,17 +217,32 @@ if [[ -n "$ACTIVE_ENV_FILE" ]]; then
     fi
 fi
 
-# Build command as an array to prevent shell injection and handle spaces (Fix VULN-002)
-case $mode_choice in
-    2) COMMAND=("/bin/bash") ;;
-    *) 
-        COMMAND=("claude") 
-        if [[ -n "$SYSTEM_PROMPT_FILE_PATH" ]]; then
-            echo "Info: Using system prompt file: $SYSTEM_PROMPT_FILE_PATH"
-            COMMAND=("claude" "--system-prompt-file" "$SYSTEM_PROMPT_FILE_PATH")
-        fi
-        ;;
-esac
+# Build command based on interactivity
+if [ "$INTERACTIVE" = true ]; then
+    echo "------------------------------------------"
+    echo "Select operation mode for Claude Code:"
+    echo "1) Launch Claude CLI (Default)"
+    echo "2) Open Bash Shell"
+    echo "------------------------------------------"
+    read -p "Choice [1-2]: " mode_choice
+
+    case $mode_choice in
+        2) COMMAND=("/bin/bash") ;;
+        *) 
+            COMMAND=("claude") 
+            if [[ -n "$SYSTEM_PROMPT_FILE_PATH" ]]; then
+                echo "Info: Using system prompt file: $SYSTEM_PROMPT_FILE_PATH"
+                COMMAND=("claude" "--system-prompt-file" "$SYSTEM_PROMPT_FILE_PATH")
+            fi
+            ;;
+    esac
+else
+    COMMAND=("claude") 
+    if [[ -n "$SYSTEM_PROMPT_FILE_PATH" ]]; then
+        echo "Info: Using system prompt file: $SYSTEM_PROMPT_FILE_PATH"
+        COMMAND=("claude" "--system-prompt-file" "$SYSTEM_PROMPT_FILE_PATH")
+    fi
+fi
 
 echo "------------------------------------------"
 echo "Launching container..."

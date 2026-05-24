@@ -50,7 +50,38 @@ Launch a fresh Claude Code session independent of the Ollama stack.
 ```
 *Note: This script manages its own temporary security proxy and network for each session.*
 
-### 3. Interact via Client
+**Options:**
+- `-h, --help`            : Show this help message.
+- `--interactive`         : Prompt a menu to select the operation mode (e.g., launch Claude CLI or open a bash shell).
+- `--docker-proxy`        : (Default) Use the security proxy for Docker access.
+- `--host-docker-proxy`   : Mount direct host Docker socket (**WARNING**: Grants AI root access to host).
+- `--no-docker`           : Disable Docker access completely.
+- `--workspace <path>`    : Specify a custom workspace directory to mount (Default: current directory).
+- `--env-file <path>`     : Specify a custom `.env` file to use.
+- `-c, --context-length <n>`: Set the Ollama context length (Default: 64000).
+- `--hostmap`             : Mount host `/etc/hosts` to container `/etc/hosts` (read-only).
+
+### 3. Run AGY CLI (Standalone)
+Launch the AGY CLI tool in a security-hardened container.
+
+```bash
+./run_agycli.sh [options]
+```
+
+**Options:**
+- `-h, --help`            : Show this help message.
+- `--interactive`         : Prompt a menu to select the operation mode (e.g., launch AGY CLI or open a bash shell).
+- `--docker-proxy`        : (Default) Use the security proxy for Docker access.
+- `--host-docker-proxy`   : Mount direct host Docker socket (**WARNING**: Grants AI root access to host).
+- `--no-docker`           : Disable Docker access completely.
+- `--no-gpu`              : Disable GPU support.
+- `--workspace <path>`    : Specify a custom workspace directory to mount (Default: current directory).
+- `--env-file <path>`     : Specify a custom `.env` file to use.
+- `--agycli-env [path]`   : Specify a custom `.agycli-env` file to read and mount (Default: `.agycli-env`).
+- `-c, --context-length <n>`: Set the Ollama context length (Default: 64000).
+- `--hostmap`             : Mount host `/etc/hosts` to container `/etc/hosts` (read-only).
+
+### 4. Interact via Client
 To enter a model shell or launch Claude inside the existing stack:
 ```bash
 ./run_model.sh
