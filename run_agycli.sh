@@ -10,6 +10,7 @@ USE_AGYCLI_ENV=false
 AGYCLI_ENV_FILE=""
 HOST_MAP=false
 USE_GPU=true
+INTERACTIVE=false
 
 # Detect GPU support
 GPU_ARG=""
@@ -97,6 +98,7 @@ show_help() {
     echo ""
     echo "Options:"
     echo "  -h, --help            Show this help message"
+    echo "  --interactive         Prompt menu to select operation mode"
     echo "  --docker-proxy        Use a security proxy for Docker access (Default, safe)"
     echo "  --host-docker-proxy   Mount direct host Docker socket (WARNING: Grant AI root access to host)"
     echo "  --no-docker           Disable Docker access completely"
@@ -115,6 +117,10 @@ while [[ "$#" -gt 0 ]]; do
         -h|--help)
             show_help
             exit 0
+            ;;
+        --interactive)
+            INTERACTIVE=true
+            shift
             ;;
         --docker-proxy)
             DOCKER_MODE="proxy"
@@ -294,18 +300,22 @@ IMAGE="tuapuikia/agy-cli:latest"
 echo "Checking for latest image: $IMAGE..."
 docker pull "$IMAGE"
 
-echo "------------------------------------------"
-echo "Select operation mode for AGY CLI:"
-echo "1) Launch AGY CLI (Default)"
-echo "2) Open Bash Shell"
-echo "------------------------------------------"
-read -p "Choice [1-2]: " mode_choice
+# Build command based on interactivity
+if [ "$INTERACTIVE" = true ]; then
+    echo "------------------------------------------"
+    echo "Select operation mode for AGY CLI:"
+    echo "1) Launch AGY CLI (Default)"
+    echo "2) Open Bash Shell"
+    echo "------------------------------------------"
+    read -p "Choice [1-2]: " mode_choice
 
-# Build command as an array
-case $mode_choice in
-    2) COMMAND=("/bin/bash") ;;
-    *) COMMAND=("agy") ;;
-esac
+    case $mode_choice in
+        2) COMMAND=("/bin/bash") ;;
+        *) COMMAND=("agy") ;;
+    esac
+else
+    COMMAND=("agy")
+fi
 
 echo "------------------------------------------"
 echo "Launching container..."
