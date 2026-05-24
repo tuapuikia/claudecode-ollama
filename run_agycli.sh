@@ -6,6 +6,8 @@ WORKSPACE_DIR="$ORIGINAL_PWD"
 DOCKER_MODE="proxy" # proxy (default), host, none
 OLLAMA_CONTEXT_LENGTH="64000"
 CUSTOM_ENV_FILE=""
+USE_AGYCLI_ENV=false
+AGYCLI_ENV_FILE=""
 HOST_MAP=false
 USE_GPU=true
 
@@ -101,6 +103,7 @@ show_help() {
     echo "  --no-gpu              Disable GPU support"
     echo "  --workspace <path>    Specify a custom workspace directory to mount (Default: current directory)"
     echo "  --env-file <path>     Specify a custom .env file to use"
+    echo "  --agycli-env [path]   Specify a custom .agycli-env file to read and mount (Default: .agycli-env)"
     echo "  --context-length <n>  Set the Ollama context length (Default: 64000)"
     echo "  --hostmap             Mount host /etc/hosts to container /etc/hosts (read-only)"
     echo ""
@@ -149,6 +152,16 @@ while [[ "$#" -gt 0 ]]; do
             else
                 echo "Error: --env-file requires a path."
                 exit 1
+            fi
+            ;;
+        --agycli-env)
+            USE_AGYCLI_ENV=true
+            if [[ -n "$2" ]] && [[ "$2" != -* ]]; then
+                # Resolve to absolute path
+                AGYCLI_ENV_FILE=$(readlink -f "$2")
+                shift 2
+            else
+                shift
             fi
             ;;
         --context-length|-c)
@@ -243,6 +256,38 @@ if [[ -n "$ACTIVE_ENV_FILE" ]]; then
     ENV_FILE_ARGS=("--env-file" "$ACTIVE_ENV_FILE")
 fi
 
+# Check for .agycli-env file
+ACTIVE_AGYCLI_ENV=""
+SANDBOX_FLAGS=""
+if [[ -n "$AGYCLI_ENV_FILE" ]]; then
+    if [ -f "$AGYCLI_ENV_FILE" ]; then
+        ACTIVE_AGYCLI_ENV="$AGYCLI_ENV_FILE"
+    else
+        echo "Error: Specified agycli-env file '$AGYCLI_ENV_FILE' not found."
+        exit 1
+    fi
+elif [ -f "$HOME/.agycli-env" ]; then
+    ACTIVE_AGYCLI_ENV="$HOME/.agycli-env"
+elif [ "$USE_AGYCLI_ENV" = true ]; then
+    echo "Error: --agycli-env specified but default file $HOME/.agycli-env not found."
+    exit 1
+fi
+
+if [[ -n "$ACTIVE_AGYCLI_ENV" ]]; then
+    # Verify ownership and permissions
+    if [ "$(stat -c '%u' "$ACTIVE_AGYCLI_ENV")" -ne "$(id -u)" ]; then
+        echo "Security Error: $ACTIVE_AGYCLI_ENV must be owned by the current user (UID $(id -u))."
+        exit 1
+    fi
+    if [ "$(stat -c '%a' "$ACTIVE_AGYCLI_ENV")" != "700" ]; then
+        echo "Info: Securing $ACTIVE_AGYCLI_ENV by setting permissions to 0700..."
+        chmod 700 "$ACTIVE_AGYCLI_ENV"
+    fi
+
+    echo "Info: Using agycli-env file: $ACTIVE_AGYCLI_ENV"
+    source "$ACTIVE_AGYCLI_ENV"
+fi
+
 IMAGE="tuapuikia/agy-cli:latest"
 
 # Always check for the latest image before running
@@ -269,6 +314,9 @@ echo "Docker Mode: $DOCKER_MODE"
 echo "Workspace:   $WORKSPACE_DIR"
 echo "AGY Config:  $AGY_HOST_DIR"
 echo "AGY CLI:     $AGY_CLI_HOST_DIR"
+if [[ -n "$ACTIVE_AGYCLI_ENV" ]]; then
+echo "AGY CLI Env: $ACTIVE_AGYCLI_ENV"
+fi
 echo "Host Map:    $HOST_MAP"
 echo "GPU Support: ${GPU_ARG:-Disabled}"
 echo "------------------------------------------"
@@ -302,6 +350,7 @@ $DOCKER_CMD run -it --rm \
     $DOCKER_MOUNT_ARG \
     $DOCKER_ENV_ARG \
     $HOSTMAP_MOUNT_ARG \
+    $SANDBOX_FLAGS \
     "${ENV_FILE_ARGS[@]}" \
     -e OLLAMA_CONTEXT_LENGTH="$OLLAMA_CONTEXT_LENGTH" \
     -v "$WORKSPACE_DIR:/workspace" \
