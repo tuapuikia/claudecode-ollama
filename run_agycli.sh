@@ -361,11 +361,11 @@ CONTAINER_PASSWD=$(mktemp)
 CONTAINER_GROUP=$(mktemp)
 echo "root:x:0:0:root:/root:/bin/bash" > "$CONTAINER_PASSWD"
 if [ "$(id -u)" -ne 0 ]; then
-    echo "$(id -un):x:$(id -u):$(id -g)::/home/node:/bin/bash" >> "$CONTAINER_PASSWD"
+    echo "node:x:$(id -u):$(id -g)::/home/node:/bin/bash" >> "$CONTAINER_PASSWD"
 fi
 echo "root:x:0:" > "$CONTAINER_GROUP"
 if [ "$(id -g)" -ne 0 ]; then
-    echo "$(id -gn):x:$(id -g):" >> "$CONTAINER_GROUP"
+    echo "node:x:$(id -g):" >> "$CONTAINER_GROUP"
 fi
 
 # Run the container

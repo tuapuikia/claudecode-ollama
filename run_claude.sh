@@ -287,11 +287,11 @@ CONTAINER_PASSWD=$(mktemp)
 CONTAINER_GROUP=$(mktemp)
 echo "root:x:0:0:root:/root:/bin/bash" > "$CONTAINER_PASSWD"
 if [ "$(id -u)" -ne 0 ]; then
-    echo "$(id -un):x:$(id -u):$(id -g)::/home/ubuntu:/bin/bash" >> "$CONTAINER_PASSWD"
+    echo "ubuntu:x:$(id -u):$(id -g)::/home/ubuntu:/bin/bash" >> "$CONTAINER_PASSWD"
 fi
 echo "root:x:0:" > "$CONTAINER_GROUP"
 if [ "$(id -g)" -ne 0 ]; then
-    echo "$(id -gn):x:$(id -g):" >> "$CONTAINER_GROUP"
+    echo "ubuntu:x:$(id -g):" >> "$CONTAINER_GROUP"
 fi
 
 $DOCKER_CMD run -it --rm \
