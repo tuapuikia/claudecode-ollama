@@ -123,7 +123,10 @@ while [[ "$#" -gt 0 ]]; do
     esac
 done
 
-# Cleanup function for proxy mode
+# Cleanup function
+CONTAINER_PASSWD=""
+CONTAINER_GROUP=""
+
 cleanup() {
     if [ -n "$PROXY_NAME" ]; then
         echo "------------------------------------------"
@@ -132,7 +135,14 @@ cleanup() {
         docker rm "$PROXY_NAME" > /dev/null 2>&1
         docker network rm "$NET_NAME" > /dev/null 2>&1
     fi
+    if [ -n "$CONTAINER_PASSWD" ] && [ -f "$CONTAINER_PASSWD" ]; then
+        rm -f "$CONTAINER_PASSWD"
+    fi
+    if [ -n "$CONTAINER_GROUP" ] && [ -f "$CONTAINER_GROUP" ]; then
+        rm -f "$CONTAINER_GROUP"
+    fi
 }
+trap cleanup EXIT INT TERM
 
 # Set variables based on Docker mode
 case $DOCKER_MODE in
@@ -164,8 +174,6 @@ case $DOCKER_MODE in
         # Enforce DOCKER_BUILDKIT=0 for maximum compatibility with restricted proxy
         DOCKER_ENV_ARG="-e DOCKER_HOST=tcp://$PROXY_NAME:2375 -e DOCKER_BUILDKIT=0 --network $NET_NAME"
         
-        # Ensure cleanup on exit or interrupt
-        trap cleanup EXIT INT TERM
         ;;
     *)
         DOCKER_MOUNT_ARG=""
@@ -274,8 +282,22 @@ fi
 # Run the container
 mkdir -p "$CLAUDE_HOME"
 [ ! -f "$CLAUDE_CONFIG" ] && touch "$CLAUDE_CONFIG"
+# Generate temporary passwd and group files to map host user and group names
+CONTAINER_PASSWD=$(mktemp)
+CONTAINER_GROUP=$(mktemp)
+echo "root:x:0:0:root:/root:/bin/bash" > "$CONTAINER_PASSWD"
+if [ "$(id -u)" -ne 0 ]; then
+    echo "$(id -un):x:$(id -u):$(id -g)::/home/ubuntu:/bin/bash" >> "$CONTAINER_PASSWD"
+fi
+echo "root:x:0:" > "$CONTAINER_GROUP"
+if [ "$(id -g)" -ne 0 ]; then
+    echo "$(id -gn):x:$(id -g):" >> "$CONTAINER_GROUP"
+fi
+
 $DOCKER_CMD run -it --rm \
     --init \
+    --user "$(id -u):$(id -g)" \
+    -e HOME=/home/ubuntu \
     --add-host=host.docker.internal:host-gateway \
     --name "claude-runner-$(date +%s)" \
     $DOCKER_MOUNT_ARG \
@@ -283,6 +305,8 @@ $DOCKER_CMD run -it --rm \
     $HOSTMAP_MOUNT_ARG \
     "${ENV_FILE_ARGS[@]}" \
     -e OLLAMA_CONTEXT_LENGTH="$OLLAMA_CONTEXT_LENGTH" \
+    -v "$CONTAINER_PASSWD:/etc/passwd:ro" \
+    -v "$CONTAINER_GROUP:/etc/group:ro" \
     -v "$WORKSPACE_DIR:$WORKSPACE_DIR" \
     -v "$CLAUDE_HOME:/home/ubuntu/.claude" \
     -v "$CLAUDE_CONFIG:/home/ubuntu/.claude.json:rw" \
