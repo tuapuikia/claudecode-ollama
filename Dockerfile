@@ -1,4 +1,4 @@
-ARG OLLAMA_TAG=0.23.1
+ARG OLLAMA_TAG=0.30.7
 FROM ollama/ollama:${OLLAMA_TAG}
 
 # Set environment variables for non-interactive installation
@@ -88,7 +88,7 @@ USER ubuntu
 WORKDIR /home/ubuntu
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 RUN curl -fsSL https://claude.ai/install.sh -o /tmp/install.sh && \
-    echo "b315b46925a9bfb9422f2503dd5aa649f680832f4c076b22d87c39d578c3d830  /tmp/install.sh" | sha256sum -c - && \
+    echo "005ec1a937f32dfbb74f9e810287bcb12cba2d5cae4c9277aa8c6364adbf1787  /tmp/install.sh" | sha256sum -c - && \
     chmod +x /tmp/install.sh && \
     yes | /tmp/install.sh && \
     rm /tmp/install.sh
