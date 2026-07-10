@@ -1,4 +1,4 @@
-ARG OLLAMA_TAG=0.30.7
+ARG OLLAMA_TAG=0.31.2
 FROM ollama/ollama:${OLLAMA_TAG}
 
 # Set environment variables for non-interactive installation
@@ -68,7 +68,9 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2
     curl -LO https://go.dev/dl/go1.24.5.linux-amd64.tar.gz && \
     rm -rf /usr/local/go && \
     tar -C /usr/local -xzf go1.24.5.linux-amd64.tar.gz && \
-    rm go1.24.5.linux-amd64.tar.gz
+    rm go1.24.5.linux-amd64.tar.gz && \
+    curl -sLo vet.tar.gz https://github.com/safedep/vet/releases/download/v1.17.5/vet_Linux_x86_64.tar.gz && \
+    tar -xzf vet.tar.gz vet && mv vet /usr/local/sbin/ && rm vet.tar.gz
 
 # Set up Go and Python environment
 ENV PATH="/usr/local/go/bin:${PATH}"
@@ -88,7 +90,7 @@ USER ubuntu
 WORKDIR /home/ubuntu
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 RUN curl -fsSL https://claude.ai/install.sh -o /tmp/install.sh && \
-    echo "005ec1a937f32dfbb74f9e810287bcb12cba2d5cae4c9277aa8c6364adbf1787  /tmp/install.sh" | sha256sum -c - && \
+    echo "b3f79015b54c751440a6488f07b1b64f9088742b9052bc1bd356d13108320d2a  /tmp/install.sh" | sha256sum -c - && \
     chmod +x /tmp/install.sh && \
     yes | /tmp/install.sh && \
     rm /tmp/install.sh
